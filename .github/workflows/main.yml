@@ -1,0 +1,39 @@
+name: Windows-Bore-RDP
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: 1. Konfigurasi User & RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          $password = ConvertTo-SecureString "P@ssw0rd123!" -AsPlainText -Force
+          New-LocalUser -Name "RDPUser" -Password $password -FullName "Remote User"
+          Add-LocalGroupMember -Group "Administrators" -Member "RDPUser"
+
+      - name: 2. Install & Jalankan Bore Tunnel
+        run: |
+          # Download Bore CLI
+          Invoke-WebRequest -Uri https://github.com/ekzhang/bore/releases/download/v0.5.1/bore-v0.5.1-x86_64-pc-windows-msvc.zip -OutFile bore.zip
+          Expand-Archive bore.zip -DestinationPath .
+          
+          # Jalankan Tunnel ke port RDP (3389)
+          # Bore akan otomatis menampilkan endpoint di log
+          Start-Process ./bore.exe -ArgumentList "local 3389 --to bore.pub" -NoNewWindow
+          
+          Write-Host "=========================================="
+          Write-Host "TUNGGU 10 DETIK, LALU CEK LOG DI ATAS/BAWAH"
+          Write-Host "Cari tulisan: listening at bore.pub:XXXXX"
+          Write-Host "=========================================="
+          
+          # Loop agar runner tidak mati
+          $i = 0
+          while($i -lt 360) {
+            Write-Host "[$(Get-Date)] Runner Active..."
+            Start-Sleep -Seconds 60
+            $i++
+          }
